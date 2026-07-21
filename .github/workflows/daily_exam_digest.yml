@@ -36,7 +36,7 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: python main.py
-        timeout-minutes: 15  # Allow time for model download on first run
+        timeout-minutes: 25  # Allow time for model download on first run
         
       - name: Upload PDF artifact
         if: always()
