@@ -48,7 +48,7 @@ def main():
 
     # Scrape
     print("\n🔍 Scraping & filtering exam-relevant articles...")
-    scraper = ExamNewsScraper()
+    scraper = AIExamNewsScraper()
     categorized_articles = scraper.scrape_all()
 
     total = sum(len(v) for v in categorized_articles.values())
