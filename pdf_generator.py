@@ -73,7 +73,7 @@ class PDFGenerator:
         
         # Body text style
         self.styles.add(ParagraphStyle(
-            name='BodyText',
+            name='CustomBodyText',
             parent=self.styles['Normal'],
             fontSize=10,
             leading=14,
@@ -157,7 +157,7 @@ class PDFGenerator:
                 # Truncate very long articles
                 if len(body_text) > 8000:
                     body_text = body_text[:8000] + "... [truncated]"
-                story.append(Paragraph(body_text, self.styles['BodyText']))
+                story.append(Paragraph(body_text, self.styles['CustomBodyText']))
                 
                 # Source URL
                 story.append(Paragraph(
