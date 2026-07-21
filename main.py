@@ -20,7 +20,7 @@ try:
 except LookupError:
     nltk.download('punkt', quiet=True)
 
-from scraper import ExamNewsScraper
+from ai_scraper import AIExamNewsScraper
 from pdf_generator import ExamPDFGenerator
 from telegram_sender import TelegramSender
 from config import PDF_OUTPUT_PATH, PDF_TITLE
