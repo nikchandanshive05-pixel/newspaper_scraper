@@ -2,8 +2,10 @@ newspaper3k
 requests
 beautifulsoup4
 lxml
+lxml-html-clean
 python-telegram-bot>=20.0
 reportlab
 Pillow
 nltk
+
 
