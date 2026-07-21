@@ -2,35 +2,42 @@ name: Daily Exam News Digest
 
 on:
   schedule:
-    - cron: '0 6 * * *'   # 6 AM UTC daily
+    - cron: '0 6 * * *'
   workflow_dispatch:
 
 jobs:
   scrape:
     runs-on: ubuntu-latest
-
+    
     steps:
       - uses: actions/checkout@v4
-
+      
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-
+          
+      - name: Cache AI model
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface
+          key: huggingface-bart-${{ runner.os }}
+          
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-
+          
       - name: Download NLTK data
         run: python -c "import nltk; nltk.download('punkt', quiet=True)"
-
-      - name: Run scraper
+          
+      - name: Run AI scraper
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: python main.py
-
+        timeout-minutes: 15  # Allow time for model download on first run
+        
       - name: Upload PDF artifact
         if: always()
         uses: actions/upload-artifact@v4
