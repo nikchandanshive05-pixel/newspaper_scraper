@@ -1,10 +1,11 @@
 """
-Telegram bot for sending PDF.
+Telegram bot for sending HTML notes and summaries.
 """
 
 from telegram import Bot
 from telegram.constants import ParseMode
 import asyncio
+from datetime import datetime
 from config import TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
 
 
@@ -13,31 +14,40 @@ class TelegramSender:
         self.bot = Bot(token=TELEGRAM_BOT_TOKEN)
         self.chat_id = TELEGRAM_CHAT_ID
 
-    async def send_pdf(self, pdf_path: str, caption: str = None) -> bool:
+    async def send_file(self, file_path: str, caption: str = None, filename: str = None) -> bool:
+        """
+        Send any file (HTML, PDF, etc.) to Telegram.
+        """
         try:
             if not caption:
-                from datetime import datetime
                 caption = (
-                    f"📰 <b>Daily Exam News Digest</b>\n"
+                    f"📰 <b>Daily Exam Notes</b>\n"
                     f"📅 {datetime.now().strftime('%B %d, %Y')}\n"
-                    f"📚 UPSC | MPSC | SSC | Banking | RBI"
+                    f"📚 UPSC | MPSC | SSC | Banking | RBI\n\n"
+                    f"🤖 <i>Powered by Gemini 1.5 Pro</i>"
                 )
 
-            with open(pdf_path, 'rb') as pdf_file:
+            actual_filename = filename or file_path.split('/')[-1]
+
+            with open(file_path, 'rb') as f:
                 await self.bot.send_document(
                     chat_id=self.chat_id,
-                    document=pdf_file,
-                    filename="daily_exam_digest.pdf",
+                    document=f,
+                    filename=actual_filename,
                     caption=caption,
                     parse_mode=ParseMode.HTML
                 )
 
-            print("✅ PDF sent to Telegram successfully!")
+            print("✅ File sent to Telegram successfully!")
             return True
 
         except Exception as e:
-            print(f"❌ Failed to send PDF: {e}")
+            print(f"❌ Failed to send file: {e}")
             return False
 
+    def send_file_sync(self, file_path: str, caption: str = None, filename: str = None) -> bool:
+        return asyncio.run(self.send_file(file_path, caption, filename))
+
+    # Backward compatibility
     def send_pdf_sync(self, pdf_path: str, caption: str = None) -> bool:
-        return asyncio.run(self.send_pdf(pdf_path, caption))
+        return self.send_file_sync(pdf_path, caption, filename="daily_exam_digest.pdf")
