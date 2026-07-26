@@ -1,5 +1,5 @@
 """
-Configuration - GitHub Actions secrets auto-override via env vars.
+Configuration — GitHub Actions secrets auto-override via env vars.
 """
 
 import os
@@ -16,42 +16,61 @@ if not TELEGRAM_CHAT_ID:
     print("❌ TELEGRAM_CHAT_ID not set!")
     sys.exit(1)
 
+# ─── Gemini AI ──────────────────────────────────────────────────────
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-1.5-pro")
+GEMINI_BATCH_SIZE = int(os.getenv("GEMINI_BATCH_SIZE", "5"))
+ENABLE_GEMINI = os.getenv("ENABLE_GEMINI", "true").lower() == "true"
+
+if ENABLE_GEMINI and not GEMINI_API_KEY:
+    print("⚠️  GEMINI_API_KEY not set. Falling back to keyword classification.")
+
 # ─── Sources ────────────────────────────────────────────────────────
 SOURCES = {
     "The Hindu": {
         "url": "https://www.thehindu.com/",
-        "max_articles": 15,
-        "language": "en"
+        "max_articles": 12,
+        "language": "en",
+        "type": "newspaper"
     },
     "Indian Express": {
         "url": "https://indianexpress.com/",
-        "max_articles": 15,
-        "language": "en"
+        "max_articles": 12,
+        "language": "en",
+        "type": "newspaper"
     },
     "Lokmat": {
         "url": "https://www.lokmat.com/",
-        "max_articles": 10,
-        "language": "mr"
+        "max_articles": 8,
+        "language": "mr",
+        "type": "newspaper"
     },
     "Loksatta": {
         "url": "https://www.loksatta.com/",
-        "max_articles": 10,
-        "language": "mr"
+        "max_articles": 8,
+        "language": "mr",
+        "type": "newspaper"
     },
     "eSakal": {
         "url": "https://www.esakal.com/",
-        "max_articles": 10,
-        "language": "mr"
+        "max_articles": 8,
+        "language": "mr",
+        "type": "newspaper"
+    },
+    "GKToday": {
+        "url": "https://www.gktoday.in/current-affairs/",
+        "max_articles": 15,
+        "language": "en",
+        "type": "gktoday"
     }
 }
 
-# ─── Exam-Relevant Topic Keywords ───────────────────────────────────
-# Articles are scored and categorized based on these keywords
+# ─── Exam-Relevant Topic Keywords (Fallback when Gemini is off) ─────
 TOPIC_CATEGORIES = {
     "🏛️ Polity & Governance": [
         "parliament", "constitution", "amendment", "bill", "act", "supreme court",
         "high court", "election", "commission", "governor", "president", "cabinet",
-        "ministry", "policy", "governance", "judicial", "legislation", " ordinance",
+        "ministry", "policy", "governance", "judicial", "legislation", "ordinance",
         "delimitation", "federalism", "local government", "panchayat", "municipal",
         "anti-defection", "schedule", "article", "fundamental right", "directive principle"
     ],
@@ -125,9 +144,9 @@ TOPIC_CATEGORIES = {
     ]
 }
 
-# Minimum score for an article to be included (out of 10)
+# Minimum score for fallback keyword classification
 MIN_RELEVANCE_SCORE = 2
 
-# ─── PDF Settings ───────────────────────────────────────────────────
-PDF_OUTPUT_PATH = os.getenv("PDF_OUTPUT_PATH", "daily_newspaper.pdf")
-PDF_TITLE = os.getenv("PDF_TITLE", "Daily Exam News Digest")
+# ─── Output Settings ────────────────────────────────────────────────
+HTML_OUTPUT_PATH = os.getenv("HTML_OUTPUT_PATH", "daily_exam_notes.html")
+NOTES_TITLE = os.getenv("NOTES_TITLE", "UPSC Daily Exam Notes")
