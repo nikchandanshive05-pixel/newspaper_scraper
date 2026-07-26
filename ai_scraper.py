@@ -1,5 +1,5 @@
 """
-Strict Exam News Scraper - Filters out garbage aggressively.
+Enhanced Exam News Scraper — with Gemini AI classification and GKToday support.
 """
 
 import newspaper
@@ -11,155 +11,41 @@ from typing import Dict, List
 from collections import defaultdict
 from datetime import datetime, timedelta
 
+from gktoday_scraper import GKTodayScraper
+from gemini_processor import GeminiProcessor
+
 
 class AIExamNewsScraper:
     """
-    Strict scraper with aggressive filtering for exam-relevant news only.
+    Strict scraper with AI-powered classification for exam-relevant news.
     """
 
-    TOPIC_DEFINITIONS = {
-        "🏛️ Polity & Governance": [
-            ("parliament", 3), ("constitution", 3), ("amendment", 3), ("bill", 2), ("act", 2),
-            ("supreme court", 3), ("high court", 2), ("election", 2), ("commission", 2),
-            ("governor", 2), ("president", 2), ("cabinet", 2), ("ministry", 2), ("policy", 2),
-            ("governance", 2), ("judicial", 2), ("legislation", 2), ("ordinance", 2),
-            ("delimitation", 3), ("federalism", 2), ("panchayat", 2), ("municipal", 1),
-            ("anti-defection", 2), ("fundamental right", 2), ("directive principle", 2),
-            ("lok sabha", 2), ("rajya sabha", 2), ("mp", 1), ("mla", 1),
-            ("bjp", 1), ("congress", 1), ("modi", 1), ("rahul gandhi", 1),
-            ("opposition", 1), ("government", 1), ("cabinet", 2)
-        ],
-        "💰 Economy & Finance": [
-            ("gdp", 3), ("inflation", 3), ("rbi", 3), ("reserve bank", 3), ("monetary policy", 3),
-            ("fiscal", 2), ("budget", 3), ("tax", 2), ("gst", 3), ("trade", 2),
-            ("export", 2), ("import", 2), ("fdi", 2), ("fii", 2), ("stock market", 2),
-            ("sensex", 2), ("nifty", 2), ("banking", 2), ("insurance", 2), ("sebi", 2),
-            ("imf", 2), ("world bank", 2), ("wto", 2), ("tariff", 2), ("subsidy", 2),
-            ("msme", 2), ("startup", 2), ("digital payment", 2), ("upi", 2),
-            ("cryptocurrency", 2), ("rupee", 2), ("fiscal deficit", 3), ("repo rate", 3),
-            ("interest rate", 2), ("forex", 2), ("foreign exchange", 2)
-        ],
-        "🌍 International Relations": [
-            ("bilateral", 2), ("multilateral", 2), ("summit", 2), ("g20", 3), ("g7", 2),
-            ("brics", 3), ("saarc", 2), ("un", 2), ("unsc", 3), ("nato", 2),
-            ("asean", 2), ("eu", 2), ("treaty", 2), ("agreement", 2), ("mou", 2),
-            ("diplomatic", 2), ("embassy", 2), ("border dispute", 3), ("foreign policy", 2),
-            ("defence deal", 2), ("india-china", 3), ("india-us", 2), ("india-russia", 2),
-            ("pakistan", 2), ("afghanistan", 2), ("myanmar", 2), ("bangladesh", 2),
-            ("nepal", 2), ("sri lanka", 2), ("maldives", 2), ("israel", 2),
-            ("iran", 2), ("china", 1), ("america", 1), ("biden", 1), ("putin", 1)
-        ],
-        "🛡️ Defence & Security": [
-            ("defence", 2), ("military", 2), ("army", 2), ("navy", 2), ("air force", 2),
-            ("coast guard", 2), ("paramilitary", 2), ("crpf", 2), ("bsf", 2), ("itbp", 2),
-            ("missile", 3), ("drdo", 3), ("isro", 3), ("space mission", 3), ("satellite", 2),
-            ("nuclear", 2), ("terrorism", 2), ("naxal", 2), ("maoist", 2), ("insurgency", 2),
-            ("cyber security", 3), ("border security", 2), ("internal security", 2),
-            ("intelligence", 2), ("raw", 2), ("ib", 2), ("agniveer", 2), ("tejas", 2),
-            ("agni", 2), ("prithvi", 2), ("akash", 2), ("brahmos", 2),
-            ("gaganyaan", 3), ("chandrayaan", 3), ("rocket", 2), ("launch", 2)
-        ],
-        "🔬 Science & Technology": [
-            ("isro", 3), ("space mission", 3), ("rocket", 2), ("satellite", 2), ("mars", 2),
-            ("moon", 2), ("gaganyaan", 3), ("chandrayaan", 3), ("agnikul", 2), ("skyroot", 2),
-            ("drdo", 2), ("ai", 2), ("artificial intelligence", 3), ("machine learning", 2),
-            ("quantum", 2), ("biotechnology", 2), ("genome", 2), ("vaccine", 2),
-            ("renewable energy", 2), ("solar", 2), ("hydrogen", 2),
-            ("electric vehicle", 2), ("semiconductor", 3), ("chip", 2), ("5g", 2), ("6g", 2),
-            ("telecom", 2), ("digital india", 2), ("innovation", 1),
-            ("research", 1), ("scientist", 1), ("discovery", 1)
-        ],
-        "🌿 Environment & Ecology": [
-            ("climate change", 3), ("global warming", 3), ("cop", 2), ("paris agreement", 3),
-            ("biodiversity", 2), ("species", 1), ("endangered", 2), ("extinction", 2),
-            ("wildlife", 2), ("tiger", 2), ("elephant", 2), ("lion", 2), ("rhino", 2),
-            ("forest", 2), ("deforestation", 2), ("afforestation", 2), ("wetland", 2),
-            ("ramsar", 3), ("pollution", 2), ("air quality", 2), ("water quality", 2),
-            ("waste management", 2), ("renewable", 2), ("sustainable", 2), ("green energy", 2),
-            ("carbon", 2), ("net zero", 3), ("national park", 2), ("sanctuary", 2),
-            ("biosphere", 2), ("tiger reserve", 2), ("coral", 1), ("glacier", 2),
-            ("cyclone", 2), ("flood", 2), ("drought", 2), ("earthquake", 2)
-        ],
-        "👥 Social Issues": [
-            ("education", 2), ("health", 2), ("healthcare", 2), ("hospital", 1),
-            ("poverty", 2), ("inequality", 2), ("caste", 2), ("tribe", 2),
-            ("scheduled caste", 3), ("scheduled tribe", 3), ("women empowerment", 3),
-            ("gender", 2), ("child rights", 2), ("juvenile", 2), ("labour", 2),
-            ("migrant", 2), ("unemployment", 2), ("job", 1),
-            ("nutrition", 2), ("mid-day meal", 2), ("anganwadi", 2), ("pension", 2),
-            ("scheme", 2), ("yojana", 3), ("mission", 2), ("programme", 2), ("welfare", 2),
-            ("neet", 2), ("upsc", 2), ("ssc", 2), ("exam", 1), ("paper leak", 2)
-        ],
-        "📜 History & Culture": [
-            ("archaeological", 2), ("excavation", 2), ("heritage", 2), ("monument", 2),
-            ("museum", 2), ("artifact", 2), ("manuscript", 2), ("inscription", 2),
-            ("festival", 1), ("art form", 2), ("handloom", 2), ("unesco", 3),
-            ("world heritage", 3), ("gi tag", 3), ("cultural", 1), ("civilization", 2),
-            ("freedom struggle", 3), ("independence", 2), ("gandhi", 1), ("nehru", 1)
-        ],
-        "⚖️ Law & Judiciary": [
-            ("supreme court", 3), ("high court", 2), ("judgment", 2), ("verdict", 2),
-            ("petition", 2), ("constitutional", 2), ("fundamental right", 3),
-            ("ipc", 2), ("crpc", 2), ("bns", 2), ("bnss", 2), ("bharatiya nyaya", 3),
-            ("criminal law", 2), ("ed", 2), ("cbi", 2), ("nia", 2),
-            ("enforcement directorate", 3), ("investigation", 1), ("bail", 1),
-            ("conviction", 1), ("acquittal", 1), ("sentencing", 1), ("death penalty", 2),
-            ("pocso", 2), ("rape", 1), ("murder", 1)
-        ],
-        "🏗️ Infrastructure": [
-            ("highway", 2), ("expressway", 2), ("railway", 2), ("metro", 2),
-            ("bullet train", 3), ("airport", 2), ("port", 2), ("shipping", 2),
-            ("inland waterway", 2), ("logistics", 2), ("smart city", 3),
-            ("urban", 1), ("rural", 1), ("connectivity", 2), ("bridge", 1),
-            ("tunnel", 2), ("dam", 2), ("canal", 2), ("irrigation", 2),
-            ("power plant", 2), ("renewable energy", 2), ("grid", 2), ("transmission", 2)
-        ]
-    }
-
-    # STRICT block list - any match = instant reject
+    # STRICT block list — any match = instant reject before Gemini
     BLOCK_WORDS = [
-        # Entertainment
         "movie review", "film review", "movie rating", "bollywood", "hollywood",
         "actor", "actress", "celebrity", "red carpet", "premiere", "box office",
         "oscar", "grammy", "emmy", "filmfare", "star", "hero", "heroine",
         "director", "producer", "sequel", "remake", "biopic",
-
-        # Sports
         "cricket", "ipl", "football", "fifa", "world cup", "match", "score",
         "player", "team", "captain", "coach", "tournament", "championship",
         "sports", "athlete", "medal", "olympics", "badminton", "tennis",
-
-        # Lifestyle
         "fashion", "lifestyle", "recipe", "food", "cook", "restaurant", "cafe",
         "travel", "tourism", "hotel", "resort", "vacation", "holiday",
         "wedding", "marriage", "birthday", "anniversary", "party",
-
-        # Astrology
         "horoscope", "astrology", "zodiac", "rashifal", "rashiphal",
         "daily horoscope", "weekly horoscope", "tarot", "palmistry",
         "numerology", "vaastu", "vastu",
-
-        # Real estate / Ads
         "real estate", "property", "flat", "apartment", "rent", "lease",
         "plot", "land for sale", "commercial space", "office space",
-
-        # Crime/Gossip (not exam relevant)
         "obscene video", "sex scandal", "affair", "divorce", "custody battle",
         "murder mystery", "crime thriller", "serial killer",
-
-        # Foreign local news
         "turkey", "school shooting", "us shooting", "mass shooting",
-
-        # Static pages
         "code of ethics", "privacy policy", "terms of service", "about us",
         "contact us", "career", "job opening", "vacancy",
-
-        # Generic filler
         "trending", "viral", "must watch", "must read", "top 10", "top 5",
         "how to", "tips and tricks", "life hacks", "diy"
     ]
 
-    # Block if title contains these
     TITLE_BLOCK = [
         "review", "rating", "horoscope", "rashifal", "rashiphal",
         "movie", "film", "cricket", "ipl", "football match",
@@ -174,8 +60,9 @@ class AIExamNewsScraper:
             'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
             'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36'
         ]
-        print("\n⚡ Strict Exam News Scraper initialized")
-        print("   Filters: Entertainment, Sports, Astrology, Crime-gossip, Old news\n")
+        self.gemini = GeminiProcessor()
+        print("\n⚡ AI-Enhanced Exam News Scraper initialized")
+        print("   Pipeline: Scrape → Filter → Gemini AI → HTML Notes → Telegram\n")
 
     def _get_headers(self):
         return {
@@ -207,14 +94,13 @@ class AIExamNewsScraper:
         return text.strip()
 
     def _is_fresh_news(self, article: dict) -> bool:
-        """Reject articles older than 3 days."""
         date_str = article.get("publish_date", "")
         if not date_str or date_str == "Today":
             return True
         try:
             pub_date = datetime.strptime(date_str[:10], "%Y-%m-%d")
             age = datetime.now() - pub_date
-            return age.days <= 3
+            return age.days <= 5  # Slightly relaxed for weekly digests
         except:
             return True
 
@@ -222,17 +108,14 @@ class AIExamNewsScraper:
         title = article.get("title", "").lower()
         text = article.get("text", "")
 
-        # STRICT: Block by title keywords
         for block in self.TITLE_BLOCK:
             if block in title:
                 return False
 
-        # Block by any block word
         for block in self.BLOCK_WORDS:
             if block in title or block in text.lower()[:800]:
                 return False
 
-        # Block garbage UI text
         garbage = [
             "newsletter", "subscribe", "sign up", "login", "sso_",
             "welcome back", "create your account", "show password",
@@ -246,23 +129,26 @@ class AIExamNewsScraper:
             if g in title or g in text.lower()[:500]:
                 return False
 
-        # Must have substantial content
         if len(text) < 400:
             return False
         if len(article.get("title", "")) < 20:
             return False
 
-        # Must be fresh
         if not self._is_fresh_news(article):
             return False
 
         return True
 
     def _classify_article(self, title: str, text: str) -> dict:
+        """
+        Fallback keyword classification (used when Gemini is disabled).
+        Kept for backward compatibility.
+        """
+        from config import TOPIC_CATEGORIES
+
         combined = (title + " " + text[:1500]).lower()
         title_lower = title.lower()
 
-        # Quick reject: block words
         for block in self.BLOCK_WORDS:
             if block in title_lower:
                 return {"is_exam_relevant": False, "topic": None, "confidence": 0, "score": 0}
@@ -271,15 +157,15 @@ class AIExamNewsScraper:
         best_score = 0
         matched_keywords = []
 
-        for topic, keywords in self.TOPIC_DEFINITIONS.items():
+        for topic, keywords in TOPIC_CATEGORIES.items():
             score = 0
             matched = []
-            for keyword, weight in keywords:
+            for keyword in keywords:
                 if keyword in combined:
                     if keyword in title_lower:
-                        score += weight * 2
+                        score += 2
                     else:
-                        score += weight
+                        score += 1
                     matched.append(keyword)
 
             if score > best_score:
@@ -287,11 +173,10 @@ class AIExamNewsScraper:
                 best_topic = topic
                 matched_keywords = matched
 
-        # STRICT: Need higher score to pass
-        if best_score < 4:
+        if best_score < 3:
             return {"is_exam_relevant": False, "topic": None, "confidence": 0, "score": 0}
 
-        normalized_score = min(10, int(best_score / 2))
+        normalized_score = min(10, int(best_score))
         confidence = min(0.95, 0.5 + (len(matched_keywords) * 0.05))
 
         return {
@@ -301,7 +186,43 @@ class AIExamNewsScraper:
             "score": normalized_score
         }
 
-    def scrape_source(self, source_name: str, url: str, 
+    def _normalize_title(self, title: str) -> str:
+        """Normalize title for deduplication."""
+        title = title.lower()
+        title = re.sub(r'[^\w\s]', '', title)
+        title = re.sub(r'\s+', ' ', title).strip()
+        # Remove common suffixes
+        title = re.sub(r'\s+(the hindu|indian express|lokmat|loksatta|esakal|gktoday)$', '', title)
+        return title
+
+    def _deduplicate(self, articles: List[dict]) -> List[dict]:
+        """Remove duplicate stories from different sources."""
+        seen = {}
+        unique = []
+
+        for art in articles:
+            norm = self._normalize_title(art.get("title", ""))
+            if not norm or len(norm) < 15:
+                unique.append(art)
+                continue
+
+            # Check similarity with existing
+            is_dup = False
+            for existing_norm in seen:
+                # Simple containment check + length similarity
+                if norm in existing_norm or existing_norm in norm:
+                    if abs(len(norm) - len(existing_norm)) < 20:
+                        is_dup = True
+                        break
+
+            if not is_dup:
+                seen[norm] = art
+                unique.append(art)
+
+        print(f"   🔄 Deduplication: {len(articles)} → {len(unique)} articles")
+        return unique
+
+    def scrape_source(self, source_name: str, url: str,
                       max_articles: int, language: str) -> List[dict]:
         articles = []
 
@@ -313,7 +234,7 @@ class AIExamNewsScraper:
             paper = newspaper.build(url, config=config, memoize_articles=False)
             print(f"[{source_name}] Found {len(paper.articles)} raw articles")
 
-            for article in paper.articles[:max_articles * 5]:
+            for article in paper.articles[:max_articles * 6]:
                 try:
                     article.download()
                     article.parse()
@@ -328,7 +249,7 @@ class AIExamNewsScraper:
                         "text": cleaned_text,
                         "url": article.url,
                         "source": source_name,
-                        "publish_date": str(article.publish_date)[:10] if article.publish_date else "Today",
+                        "publish_date": str(article.publish_date)[:10] if article.publish_date else datetime.now().strftime("%Y-%m-%d"),
                         "authors": ", ".join(article.authors) if article.authors else source_name,
                         "language": language
                     }
@@ -336,56 +257,58 @@ class AIExamNewsScraper:
                     if not self._is_valid_article(art):
                         continue
 
-                    result = self._classify_article(art["title"], art["text"])
-
-                    if not result["is_exam_relevant"]:
-                        print(f"  ✗ {art['title'][:55]}...")
-                        continue
-
-                    art["topic"] = result["topic"]
-                    art["confidence"] = result["confidence"]
-                    art["score"] = result["score"]
-
                     articles.append(art)
-                    print(f"  ✓ [{art['score']}/10] {art['topic'][:22]} | {art['title'][:45]}...")
+                    time.sleep(random.uniform(0.2, 0.5))
 
-                    time.sleep(random.uniform(0.3, 0.6))
-
-                except Exception as e:
+                except Exception:
                     continue
 
         except Exception as e:
             print(f"[{source_name}] Error: {e}")
 
-        articles.sort(key=lambda x: x["score"], reverse=True)
-        return articles[:max_articles]
+        return articles
 
     def scrape_all(self, sources_config=None) -> Dict[str, List[dict]]:
-        if sources_config is None:
-            from config import SOURCES as sources_config
+        from config import SOURCES as sources_config
 
-        all_articles = []
+        all_raw_articles = []
 
         for source_name, config in sources_config.items():
             print(f"\n{'='*55}")
             print(f"📰 {source_name}")
             print(f"{'='*55}")
 
-            articles = self.scrape_source(
-                source_name,
-                config["url"],
-                config.get("max_articles", 10),
-                config.get("language", "en")
-            )
-            all_articles.extend(articles)
+            if config.get("type") == "gktoday":
+                gk_scraper = GKTodayScraper()
+                articles = gk_scraper.scrape(max_articles=config.get("max_articles", 15))
+            else:
+                articles = self.scrape_source(
+                    source_name,
+                    config["url"],
+                    config.get("max_articles", 10),
+                    config.get("language", "en")
+                )
+
+            all_raw_articles.extend(articles)
             print(f"[{source_name}] Kept {len(articles)} articles")
 
-        categorized = defaultdict(list)
-        for art in all_articles:
-            topic = art.get("topic", "General Current Affairs")
-            categorized[topic].append(art)
+        # Deduplicate before AI processing
+        all_raw_articles = self._deduplicate(all_raw_articles)
 
+        # Send to Gemini for intelligent analysis
+        print(f"\n🧠 Sending {len(all_raw_articles)} articles to Gemini 1.5 Pro...")
+        enriched_articles = self.gemini.analyze_articles_batch(all_raw_articles)
+
+        # Categorize by GS Paper first, then sub-topic
+        categorized = defaultdict(list)
+        for art in enriched_articles:
+            gs = art.get("gs_paper", "General")
+            sub = art.get("sub_topic", "General")
+            key = f"{gs} — {sub}"
+            categorized[key].append(art)
+
+        # Sort within each category by relevance score
         for topic in categorized:
-            categorized[topic].sort(key=lambda x: x["score"], reverse=True)
+            categorized[topic].sort(key=lambda x: x.get("relevance_score", 0), reverse=True)
 
         return dict(categorized)
