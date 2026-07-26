@@ -18,7 +18,7 @@ if not TELEGRAM_CHAT_ID:
 
 # ─── Gemini AI ──────────────────────────────────────────────────────
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-1.5-pro")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "Gemini 2.5 Flash")
 ENABLE_GEMINI = os.getenv("ENABLE_GEMINI", "true").lower() == "true"
 MAX_GEMINI_ARTICLES = int(os.getenv("MAX_GEMINI_ARTICLES", "25"))  # Cost control
 
