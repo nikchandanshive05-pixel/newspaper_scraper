@@ -9,3 +9,10 @@ Pillow
 nltk
 transformers
 torch
+newspaper3k>=0.2.8
+requests>=2.31.0
+beautifulsoup4>=4.12.0
+lxml>=4.9.0
+nltk>=3.8
+google-generativeai>=0.7.0
+python-telegram-bot>=20.0
