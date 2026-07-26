@@ -1,47 +1,106 @@
-name: Daily Exam News Digest
+name: Daily Exam Notes — AI Powered
 
 on:
   schedule:
-    - cron: '0 6 * * *'
+    # 6:30 AM IST = 1:00 AM UTC
+    - cron: '0 1 * * *'
   workflow_dispatch:
+    inputs:
+      html_only:
+        description: 'Generate HTML only (skip Telegram)'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
 
 jobs:
-  scrape:
+  build:
     runs-on: ubuntu-latest
-    
+    timeout-minutes: 25
+
     steps:
-      - uses: actions/checkout@v4
-      
-      - name: Set up Python
+      # ─── 1. Checkout ─────────────────────────────────────────
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
+      # ─── 2. Python setup ─────────────────────────────────────
+      - name: 🐍 Set up Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-          
-      - name: Cache AI model
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/huggingface
-          key: huggingface-bart-${{ runner.os }}
-          
-      - name: Install dependencies
+          cache: 'pip'
+
+      # ─── 3. Verify secrets exist ─────────────────────────────
+      - name: 🔐 Verify secrets
+        run: |
+          missing=0
+          if [ -z "${{ secrets.TELEGRAM_BOT_TOKEN }}" ]; then
+            echo "❌ Missing: TELEGRAM_BOT_TOKEN"
+            missing=1
+          fi
+          if [ -z "${{ secrets.TELEGRAM_CHAT_ID }}" ]; then
+            echo "❌ Missing: TELEGRAM_CHAT_ID"
+            missing=1
+          fi
+          if [ -z "${{ secrets.GEMINI_API_KEY }}" ]; then
+            echo "⚠️  Missing: GEMINI_API_KEY — script will use keyword fallback"
+          else
+            echo "✅ GEMINI_API_KEY found"
+          fi
+          if [ "$missing" -eq 1 ]; then
+            exit 1
+          fi
+
+      # ─── 4. Install dependencies ─────────────────────────────
+      - name: 📦 Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          
-      - name: Download NLTK data
-        run: python -c "import nltk; nltk.download('punkt', quiet=True)"
-          
-      - name: Run AI scraper
+
+      # ─── 5. Download NLTK data ───────────────────────────────
+      - name: 🧠 Download NLTK data
+        run: |
+          python -m nltk.downloader punkt
+          python -m nltk.downloader punkt_tab || true
+
+      # ─── 6. Run scraper ──────────────────────────────────────
+      - name: 🚀 Run AI Scraper
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: python main.py
-        timeout-minutes: 59  # Allow time for model download on first run
-        
-      - name: Upload PDF artifact
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: ${{ secrets.GEMINI_MODEL || 'gemini-1.5-pro' }}
+          ENABLE_GEMINI: ${{ secrets.GEMINI_API_KEY != '' && 'true' || 'false' }}
+          HTML_OUTPUT_PATH: "daily_exam_notes.html"
+          NOTES_TITLE: "UPSC Daily Exam Notes"
+        run: |
+          if [ "${{ github.event.inputs.html_only }}" == "true" ]; then
+            echo "Running in HTML-only mode..."
+            python main.py --html-only
+          else
+            python main.py
+          fi
+
+      # ─── 7. Upload HTML artifact (backup) ────────────────────
+      - name: 📤 Upload HTML artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: exam-digest-${{ github.run_id }}
-          path: daily_newspaper.pdf
-          retention-days: 7
+          name: exam-notes-${{ github.run_number }}-${{ github.run_attempt }}
+          path: daily_exam_notes.html
+          retention-days: 14
+          if-no-files-found: warn
+
+      # ─── 8. Commit HTML to repo (optional archive) ───────────
+      - name: 💾 Archive HTML to repo (optional)
+        if: github.event_name == 'schedule'
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          mkdir -p archive
+          cp daily_exam_notes.html "archive/notes-$(date +%Y-%m-%d).html"
+          git add archive/
+          git diff --staged --quiet || git commit -m "📰 Auto-archive notes $(date +%Y-%m-%d)"
+          git push || echo "Nothing to push"
